@@ -21,10 +21,10 @@ def run_seed_and_train():
     zones = features.generate_h3_zones(bbox, resolution=9)[:12]  # Limit to 12 zones for demo
     features.build_terrain_features(zones)
     
-    # 2. Simulate 50 Historical Events (F2)
+    # 2. Simulate 500 Historical Events (F2)
     logger.info("--- STEP 2: Running Poseidon-Sim to generate synthetic historical flood data ---")
-    # Reduced to 50 events for a quick demo setup
-    poseidon_sim.generate_scenarios(n_scenarios=50)
+    # Increased to 500 events for realistic model accuracy and proper RPI/Alerts
+    poseidon_sim.generate_scenarios(n_scenarios=500)
     
     # 3. Train the XGBoost Models (F3)
     logger.info("--- STEP 3: Training XGBoost Prediction Models ---")

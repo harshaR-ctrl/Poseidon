@@ -1,0 +1,147 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>POSEIDON | Coastal Flood Intelligence</title>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;800&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <!-- Top Strip -->
+    <div id="top-strip">
+        <div class="strip-left">POSEIDON</div>
+        <div class="strip-center">
+            <span class="text-muted">MANGALURU COASTAL SECTOR</span>
+            <select id="scenario-select" class="scenario-select">
+                <option value="monsoon">Monsoon Surge (Active)</option>
+                <option value="cyclone">Cyclone Landfall</option>
+                <option value="king_tide">King Tide + Rain</option>
+                <option value="cloudburst">Urban Cloudburst</option>
+                <option value="calm">Clear Day (Baseline)</option>
+            </select>
+        </div>
+        <div class="strip-right">
+            <span id="sim-clock" class="mono text-accent">14:00</span>
+            <span id="status-label" class="status-pill"></span>
+        </div>
+    </div>
+
+    <!-- Safety Banner -->
+    <div id="safety-banner" class="safety-banner safety-safe">
+        <div class="safety-icon" id="safety-icon"></div>
+        <div class="safety-text">
+            <div class="safety-label" id="safety-label">SAFE TO STAY</div>
+            <div class="safety-message" id="safety-message">No significant flood risk detected.</div>
+        </div>
+        <div class="safety-action" id="safety-action"></div>
+    </div>
+
+    <!-- Main Content -->
+    <div id="main-container">
+        <!-- Left: Map -->
+        <div id="map-container">
+            <div id="map"></div>
+            <!-- Map Legend -->
+            <div id="map-legend">
+                <div class="legend-title">FLOOD SEVERITY</div>
+                <div class="legend-item"><span class="legend-dot" style="background:#00F0FF"></span>Low</div>
+                <div class="legend-item"><span class="legend-dot" style="background:#FFC000"></span>Moderate</div>
+                <div class="legend-item"><span class="legend-dot" style="background:#FF3366"></span>High</div>
+                <div class="legend-item"><span class="legend-dot" style="background:#FF003C"></span>Severe</div>
+            </div>
+            <!-- Selected Zone Info Overlay -->
+            <div id="zone-info-overlay">
+                <div class="zone-info-name" id="overlay-name">--</div>
+                <div class="zone-info-row">
+                    <span class="text-muted">Probability</span>
+                    <span class="mono" id="overlay-prob">--</span>
+                </div>
+                <div class="zone-info-row">
+                    <span class="text-muted">Peak Depth</span>
+                    <span class="mono" id="overlay-depth">--</span>
+                </div>
+                <div class="zone-info-row">
+                    <span class="text-muted">Onset</span>
+                    <span class="mono" id="overlay-onset">--</span>
+                </div>
+                <div class="zone-info-row">
+                    <span class="text-muted">RPI Score</span>
+                    <span class="mono" id="overlay-rpi">--</span>
+                </div>
+                <div class="zone-info-row">
+                    <span class="text-muted">Population</span>
+                    <span class="mono" id="overlay-pop">--</span>
+                </div>
+                <div class="zone-info-row">
+                    <span class="text-muted">Wind</span>
+                    <span class="mono" id="overlay-wind">--</span>
+                </div>
+            </div>
+            <!-- Scenario Info Overlay -->
+            <div id="scenario-overlay">
+                <div class="scenario-name" id="scenario-name">MONSOON SURGE</div>
+                <div class="scenario-desc" id="scenario-desc"></div>
+            </div>
+        </div>
+
+        <!-- Right: Panel -->
+        <div id="panel-container">
+            <div class="panel">
+                <div class="tabs">
+                    <div class="tab active" data-target="tab-alerts">ALERTS</div>
+                    <div class="tab" data-target="tab-response">RESPONSE</div>
+                    <div class="tab" data-target="tab-why">WHY</div>
+                    <div class="tab" data-target="tab-safety">SAFETY</div>
+                    <div class="tab" data-target="tab-stats">STATS</div>
+                </div>
+
+                <div id="tab-alerts" class="tab-content active">
+                    <div id="alerts-list"></div>
+                </div>
+
+                <div id="tab-response" class="tab-content">
+                    <div id="response-list"></div>
+                </div>
+
+                <div id="tab-why" class="tab-content">
+                    <div class="select-container">
+                        <select id="zone-select"></select>
+                    </div>
+                    <div id="why-content"></div>
+                </div>
+
+                <div id="tab-safety" class="tab-content">
+                    <div id="safety-detail"></div>
+                </div>
+
+                <div id="tab-stats" class="tab-content">
+                    <div id="stats-content"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Bottom: Timeline -->
+    <div id="bottom-bar">
+        <div id="scrubber-container">
+            <div class="slider-header">SIMULATION HOUR</div>
+            <input type="range" id="time-slider" min="0" max="23" value="14">
+            <div class="slider-labels">
+                <span class="mono">00:00</span>
+                <span class="mono">12:00</span>
+                <span class="mono">23:00</span>
+            </div>
+        </div>
+        <div id="chart-container">
+            <canvas id="timeline-chart"></canvas>
+        </div>
+    </div>
+
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script src="https://unpkg.com/leaflet.heat@0.2.0/dist/leaflet-heat.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="app.js"></script>
+</body>
+</html>
