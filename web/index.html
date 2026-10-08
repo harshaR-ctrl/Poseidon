@@ -6,7 +6,7 @@
     <title>POSEIDON | Coastal Flood Intelligence</title>
     <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;800&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-    <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="style.css?v=1791497364728">
 </head>
 <body>
     <!-- Top Strip -->
@@ -56,7 +56,24 @@
                 <div class="legend-item"><span class="legend-dot" style="background:#FFC000"></span>Moderate</div>
                 <div class="legend-item"><span class="legend-dot" style="background:#FF3366"></span>High</div>
                 <div class="legend-item"><span class="legend-dot" style="background:#FF003C"></span>Severe</div>
+                <div class="legend-item"><span class="legend-dot legend-overlap"></span>Approx. zone overlap</div>
+                <div class="legend-item"><span class="legend-dot legend-shelter">S</span>OSM mapped shelter</div>
+                <div class="legend-item"><span class="legend-dot legend-proposed">P</span>Proposed site · unverified</div>
+                <div class="legend-status overlap-status" id="overlap-status" aria-live="polite">Checking modeled overlaps…</div>
+                <div class="legend-status" id="shelter-status" aria-live="polite">Shelter lookup pending.</div>
             </div>
+            <details id="shelter-directory">
+                <summary><span>SHELTER LOCATIONS</span><span id="shelter-count">0 OSM · 0 proposed</span></summary>
+                <div class="proposed-site-controls">
+                    <button type="button" class="route-action primary" id="place-proposed-site">Place proposed site</button>
+                    <button type="button" class="route-action" id="remove-proposed-site" hidden>Remove</button>
+                    <div class="shelter-list-empty" id="proposed-site-status" aria-live="polite">Proposed site is not an official or verified shelter.</div>
+                </div>
+                <div class="shelter-list-heading">MAPPED · FLOOD BUFFER SCREENED</div>
+                <div id="shelter-list" aria-live="polite">Loading mapped shelters…</div>
+                <div class="shelter-list-heading proposed-heading">DEFAULT PROPOSED SITES · NOT REAL OR APPROVED</div>
+                <div id="default-proposed-list" aria-live="polite">Waiting for forecast and map data…</div>
+            </details>
             <!-- Selected Zone Info Overlay -->
             <div id="zone-info-overlay">
                 <div class="zone-info-name" id="overlay-name">--</div>
@@ -130,22 +147,25 @@
                 <div id="tab-route" class="tab-content">
                     <section class="route-workspace" id="consumer-route">
                         <h2>Evacuation route</h2>
-                        <p>Route to an OpenStreetMap-mapped shelter only. A mapped shelter is not confirmation that it is open or officially designated for this event.</p>
-                        <div class="route-coordinate-row">
+                        <p>Find the quickest flood-screened drive to an OpenStreetMap-mapped shelter. Mapping does not confirm the shelter is open or designated for this event.</p>
+                        <div class="route-coordinate-row" hidden>
                             <label>Start latitude<input id="route-lat" inputmode="decimal" placeholder="Use location or enter latitude"></label>
                             <label>Start longitude<input id="route-lon" inputmode="decimal" placeholder="Enter longitude"></label>
                         </div>
+                        <button type="button" class="route-action secondary" id="route-place-pin">Place start pin on map</button>
                         <button type="button" class="route-action" id="use-location">Use my location</button>
                         <button type="button" class="route-action primary" id="find-shelter-route">Find nearest mapped shelter</button>
+                        <button type="button" class="route-action primary" id="route-selected-shelter" hidden>Route to selected shelter</button>
                         <div id="consumer-route-status" class="route-status" aria-live="polite">No route requested.</div>
                     </section>
                     <section class="route-workspace" id="ngo-route">
                         <h2>Rescue dispatch</h2>
-                        <p>Dispatch order uses the demo RPI proxy (flood probability × modeled peak depth). Routes avoid other modeled flooded zones where OSRM offers an alternative; access inside the target zone is not verified.</p>
-                        <div class="route-coordinate-row">
+                        <p>Dispatch targets the nearest reachable SEVERE condition zone first. The route screens other modeled flooded zones; access inside the target zone is not verified.</p>
+                        <div class="route-coordinate-row" hidden>
                             <label>Team base latitude<input id="ngo-lat" inputmode="decimal" placeholder="Use location or enter latitude"></label>
                             <label>Team base longitude<input id="ngo-lon" inputmode="decimal" placeholder="Enter longitude"></label>
                         </div>
+                        <button type="button" class="route-action secondary" id="ngo-place-pin">Place team base pin on map</button>
                         <button type="button" class="route-action" id="ngo-use-location">Use my location</button>
                         <button type="button" class="route-action primary" id="plan-rescue-route">Plan highest-priority route</button>
                         <div id="ngo-route-status" class="route-status" aria-live="polite">No dispatch route requested.</div>
@@ -175,6 +195,6 @@
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <script src="https://unpkg.com/leaflet.heat@0.2.0/dist/leaflet-heat.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    <script src="app.js"></script>
+    <script src="app.js?v=1791497364728"></script>
 </body>
 </html>
