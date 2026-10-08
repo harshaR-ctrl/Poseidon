@@ -1,0 +1,220 @@
+# Poseidon City Configuration
+# Study area and parameters for coastal flood prediction
+
+# === STUDY AREA ===
+city:
+  name: Mangaluru
+  # Bounding box: [west, south, east, north] in decimal degrees
+  bbox:
+    west: 74.8425
+    south: 12.8305
+    east: 74.9075
+    north: 12.9055
+  # Area roughly 10km × 10km
+
+# === MODEL PARAMETERS ===
+model:
+  forecast_hours: 24
+  timestep_hours: 1
+  plinth_height_m: 0.30  # Default ground floor height
+
+# === FLOOD THRESHOLDS ===
+thresholds:
+  street_water_m: 0.10     # Water on street
+  road_impassable_m: 0.30  # Road impassable
+  severe_m: 0.60           # Severe flooding
+  extreme_m: 1.00          # Extreme flooding
+
+# === SIMULATION SETTINGS ===
+sim:
+  num_scenarios: 1000     # Number of synthetic events
+  storm_shape_types:  # Huff-type storm shapes
+    - name: "small"
+      total_rain_mm: 50
+    - name: "medium"
+      total_rain_mm: 150
+    - name: "large"
+      total_rain_mm: 300
+  tide_amplitudes:  # Spring/neap ranges
+    spring: 2.5
+    neap: 0.5
+  surge_range:  # Storm surge possibilities
+    min: 0.0
+    max: 1.2
+  antecedent_wetness:  # Initial soil wetness
+    dry: 0.0
+    wet: 0.3
+
+# === ML TRAINING ===
+ml:
+  n_estimators: 500
+  max_depth: -1
+  learning_rate: 0.05
+  num_leaves: 31
+  early_stopping_rounds: 50
+
+  features:
+    # Terrain features
+    - elevation
+    - slope
+    - sink_depth
+    - relative_elevation
+    - distance_to_coast
+    - distance_to_creek
+    - HAND
+    # Weather/forecast features
+    - rain_1h
+    - rain_3h
+    - rain_6h
+    - rain_24h
+    - rain_72h
+    - peak_rain_intensity
+    - time_of_rain_peak
+    # Tide/marine features
+    - current_tide
+    - high_tide_height
+    - time_to_high_tide
+    - tidal_range
+    - storm_surge
+    - wave_height
+    # Compound timing features
+    - tide_rain_overlap
+    - antecedent_rain
+    # Land cover
+    - imperviousness
+    - curve_number
+    - drainage_proxy
+
+# === UI DEFAULTS ===
+ui:
+  default_zone: "B"
+  plinth_height_options: [0.0, 0.15, 0.30, 0.45, 0.60]
+  severity_classes:
+    - name: "None"
+      depth_m: 0.0
+      color: "#8BC34A"  # Green
+    - name: "Minor"
+      depth_m: [0.10, 0.30]
+      color: "#FFEB3B"  # Yellow
+    - name: "Moderate"
+      depth_m: [0.30, 0.60]
+      color: "#FF9800"  # Orange
+    - name: "Severe"
+      depth_m: [0.60, 1.00]
+      color: "#F44336"  # Red
+    - name: "Extreme"
+      depth_m: [1.00, 100.0]
+      color: "#9C27B0"  # Purple
+
+# === ALERT SETTINGS ===
+alerts:
+  tier_thresholds:
+    - probability: 0.30
+      severity: "Advisory"
+    - probability: 0.60
+      severity: "Warning"
+    - probability: 0.80
+      severity: "Emergency"
+
+  zone_alert_template: |
+    {severity} FLOOD RISK — {zone_name}
+
+    Probability: {probability:.1%}
+    Peak depth: {peak_depth:.2f} m
+    Onset: {onset_time}
+    Peak: {peak_time}
+
+    Uncertainty:
+    Onset {onset_p10}–{onset_p90}
+    Depth {depth_p10:.2f}–{depth_p90:.2f} m
+
+    Drivers: {drivers}
+
+    Impact:
+    {impacted_roads} roads
+    {impacted_buildings} buildings
+    {impacted_facilities} facilities
+
+    Priority: #{priority_rank}
+
+# === ADVISOR SETTINGS ===
+advisor:
+  # Decision thresholds
+  safe_wait_probability: 0.30  # Low probability to wait
+  route_safety_buffer_hours: 0.5  # Time buffer before departure
+
+  # Verdict options and conditions
+  verdicts:
+    - name: "LEAVE NOW"
+      condition: "ground_floor_will_flood AND safe_route_exists"
+      description: "Ground floor flooding imminent with safe escape"
+    - name: "LEAVE BY {time}"
+      condition: "ground_floor_will_flood AND safe_until_time"
+      description: "Must leave before route closes or ground floor floods"
+    - name: "SAFE TO WAIT"
+      condition: "low_flood_probability"
+      description: "Low risk, can wait and re-check later"
+    - name: "ROUTE CUT, MOVE UPSTAIRS"
+      condition: "no_safe_route OR already_past_safe_time"
+      description: "No safe departure, move to upper floor"
+
+  # Morning/afternoon comparison
+  evening_comparison_time: "18:00"  # 6 PM comparison
+
+# === RESPONDER PRIORITY ===
+responder:
+  # Component weights (sum to 1.0)
+  weights:
+    exposure: 0.30    # Zone exposure to flood
+    vulnerability: 0.20  # Population/important assets
+    access_loss: 0.30   # Route access loss
+    urgency: 0.20       # Time until onset
+
+  # Urgency calculation
+  urgency_decay_hours: 3.0  # Higher urgency for sooner events
+
+# === EXPLAINABILITY ===
+explain:
+  # Driver thresholds for plain language
+  driver_thresholds:
+    "tide_blocked": 0.7  # Strong tide effect
+    "heavy_rain": 0.6   # Heavy rain effect
+    "low_elevation": 0.5  # Elevation effect
+    "poor_drainage": 0.4  # Drainage limitation
+
+  # Template phrases for drivers
+  phrases:
+    "tide_blocked": "high tide is blocking the drains"
+    "heavy_rain": "{rain:.0f} mm rain in {hours} hours"
+    "low_elevation": "zone is {elevation:.1f} m above sea level"
+    "poor_drainage": "limited drainage capacity"
+
+# === VALIDATION ===
+validation:
+  # Splitting strategy
+  event_split: "never_mix_same_event"
+  spatial_split: "holdout_blocks"
+
+  # Metrics
+  probability: ["roc_auc", "pr_auc", "f1", "brier"]
+  timing: ["mae_onset_10cm", "mae_onset_30cm", "mae_peak_time"]
+  depth: ["mae", "interval_coverage"]
+  calibration: ["reliability_diagram", "coverage_80"]
+
+# === LOGGING ===
+logging:
+  level: "INFO"
+  file: "poseidon.log"
+  max_size_mb: 100
+  backup_count: 5
+
+# === PERFORMANCE ===
+performance:
+  # Target metrics
+  model_inference_ms: 500  # Max inference time for all ensemble members
+  map_render_ms: 200      # Max map update time
+  household_lookup_ms: 50 # Max advisor lookup time
+
+  # Memory targets
+  cache_size_gb: 10
+  max_workers: 4
