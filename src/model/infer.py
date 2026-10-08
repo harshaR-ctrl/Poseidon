@@ -67,9 +67,8 @@ def run_inference(scenario_features, model_dir="data/models"):
     def get_severity(depth):
         if depth < 0.10: return "None"
         elif depth < 0.30: return "Minor"
-        elif depth < 0.60: return "Moderate"
-        elif depth < 1.00: return "Severe"
-        else: return "Extreme"
+        elif depth < 1.20: return "Moderate"
+        else: return "Severe"
         
     predictions['severity_class'] = predictions['peak_depth_p50'].apply(get_severity)
     

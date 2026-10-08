@@ -1,6 +1,5 @@
 import pandas as pd
 import geopandas as gpd
-import h3
 from shapely.geometry import Polygon
 import os
 import numpy as np
@@ -9,93 +8,62 @@ import logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-def generate_h3_zones(bbox, resolution=9, output_dir="data/processed"):
+FRONTEND_ZONES = [
+    { 'id': 'Z0', 'name': 'PANAMBUR',     'lat': 12.950, 'lon': 74.810, 'elev': 0.4, 'dist_coast': 0.2, 'imperv': 0.7, 'drainage': 0.35 },
+    { 'id': 'Z1', 'name': 'SURATHKAL',    'lat': 12.980, 'lon': 74.790, 'elev': 1.8, 'dist_coast': 0.3, 'imperv': 0.6, 'drainage': 0.55 },
+    { 'id': 'Z2', 'name': 'KULOOR',       'lat': 12.910, 'lon': 74.830, 'elev': 0.6, 'dist_coast': 0.8, 'imperv': 0.85, 'drainage': 0.25 },
+    { 'id': 'Z3', 'name': 'KOTTARA',      'lat': 12.900, 'lon': 74.840, 'elev': 1.0, 'dist_coast': 1.2, 'imperv': 0.75, 'drainage': 0.40 },
+    { 'id': 'Z4', 'name': 'BUNDER',       'lat': 12.860, 'lon': 74.830, 'elev': 0.3, 'dist_coast': 0.15, 'imperv': 0.90, 'drainage': 0.20 },
+    { 'id': 'Z5', 'name': 'HAMPANKATTA',  'lat': 12.870, 'lon': 74.850, 'elev': 3.5, 'dist_coast': 2.0, 'imperv': 0.70, 'drainage': 0.65 },
+    { 'id': 'Z6', 'name': 'MANGALADEVI',  'lat': 12.840, 'lon': 74.840, 'elev': 0.8, 'dist_coast': 0.6, 'imperv': 0.80, 'drainage': 0.30 },
+    { 'id': 'Z7', 'name': 'ULLAL',        'lat': 12.800, 'lon': 74.850, 'elev': 0.5, 'dist_coast': 0.1, 'imperv': 0.65, 'drainage': 0.35 }
+]
+
+def generate_h3_zones(bbox=None, resolution=9, output_dir="data/processed"):
     """
-    Grids the study area into H3 hexagons at the specified resolution.
+    Returns a dummy GeoDataFrame of the exactly mapped frontend zones.
     """
     os.makedirs(output_dir, exist_ok=True)
-    logger.info(f"Generating H3 resolution-{resolution} zones for bbox {bbox}...")
-    
-    south, west, north, east = bbox
-    
-    # Create a polygon for the bounding box
-    geo_json_polygon = {
-        "type": "Polygon",
-        "coordinates": [[[west, south], [east, south], [east, north], [west, north], [west, south]]]
-    }
-    
-    try:
-        # h3 v3.x
-        hexagons = list(h3.polyfill(geo_json_polygon, resolution))
-    except AttributeError:
-        # h3 v4.x
-        exterior = [(south, west), (south, east), (north, east), (north, west), (south, west)]
-        polygon = h3.LatLngPoly(exterior)
-        hexagons = list(h3.polygon_to_cells(polygon, resolution))
+    logger.info("Generating exact frontend zones...")
     
     zones = []
-    for h in hexagons:
-        try:
-            # h3 v3.x
-            boundaries = h3.h3_to_geo_boundary(h)
-            lat, lng = h3.h3_to_geo(h)
-        except AttributeError:
-            # h3 v4.x
-            boundaries = h3.cell_to_boundary(h)
-            lat, lng = h3.cell_to_latlng(h)
-            
-        # H3 returns (lat, lng), we need (lng, lat) for shapely
-        coords = [(lng_b, lat_b) for lat_b, lng_b in boundaries]
-        
+    for z in FRONTEND_ZONES:
+        # Create a small dummy polygon around the lat/lon
+        lat, lon = z['lat'], z['lon']
+        coords = [(lon-0.01, lat-0.01), (lon+0.01, lat-0.01), (lon+0.01, lat+0.01), (lon-0.01, lat+0.01)]
         zones.append({
-            'zone_id': h,
+            'zone_id': z['id'],
             'geometry': Polygon(coords),
             'centroid_lat': lat,
-            'centroid_lon': lng,
-            'place_name': f"Zone {h[-4:]}" # Placeholder name
+            'centroid_lon': lon,
+            'place_name': z['name']
         })
         
     gdf_zones = gpd.GeoDataFrame(zones, crs="EPSG:4326")
     gdf_zones.to_parquet(os.path.join(output_dir, "zones.parquet"))
-    logger.info(f"Generated {len(zones)} H3 zones and saved to zones.parquet.")
+    logger.info(f"Generated {len(zones)} UI zones and saved to zones.parquet.")
     return gdf_zones
 
 def build_terrain_features(gdf_zones, output_dir="data/processed"):
     """
-    Creates synthetic terrain features for each H3 zone.
-    In a real scenario, this would sample a DEM and compute HAND.
+    Creates terrain features that perfectly match the frontend parameters.
     """
     logger.info("Building terrain features table...")
     
     features = []
-    
-    # Synthetic terrain generation: 
-    # East is higher, West (coast) is lower
-    min_lon, max_lon = gdf_zones.centroid_lon.min(), gdf_zones.centroid_lon.max()
-    
-    for _, row in gdf_zones.iterrows():
-        # Fake elevation: sloping down to the west coast
-        lon_normalized = (row.centroid_lon - min_lon) / (max_lon - min_lon + 1e-6)
-        elevation = 2.0 + (lon_normalized * 25.0) # 2m to 27m
-        
-        # Add some noise
-        elevation += np.random.normal(0, 2)
-        elevation = max(0.5, elevation)
-        
-        dist_to_coast = lon_normalized * 10.0 # up to 10km
-        
+    for z in FRONTEND_ZONES:
         features.append({
-            'zone_id': row.zone_id,
-            'elevation_mean': elevation,
-            'elevation_min': max(0, elevation - 1),
-            'elevation_max': elevation + 1,
-            'slope_mean': np.random.uniform(0.5, 5.0),
-            'sink_depth': np.random.exponential(0.2),
-            'relative_elevation': elevation, # Mock
-            'distance_to_coast': dist_to_coast,
-            'distance_to_creek': np.random.uniform(0.1, 3.0),
-            'imperviousness': np.random.uniform(0.2, 0.9),
-            'drainage_proxy': np.random.uniform(0.3, 0.8)
+            'zone_id': z['id'],
+            'elevation_mean': z['elev'],
+            'elevation_min': max(0, z['elev'] - 0.5),
+            'elevation_max': z['elev'] + 0.5,
+            'slope_mean': 1.0,
+            'sink_depth': 0.15,
+            'relative_elevation': z['elev'],
+            'distance_to_coast': z['dist_coast'],
+            'distance_to_creek': 0.5,
+            'imperviousness': z['imperv'],
+            'drainage_proxy': z['drainage']
         })
         
     df_features = pd.DataFrame(features)
@@ -104,7 +72,5 @@ def build_terrain_features(gdf_zones, output_dir="data/processed"):
     return df_features
 
 if __name__ == "__main__":
-    # Mangaluru bbox
-    bbox = (12.83, 74.82, 12.93, 74.92)
-    zones = generate_h3_zones(bbox)
+    zones = generate_h3_zones()
     build_terrain_features(zones)

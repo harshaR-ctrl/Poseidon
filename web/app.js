@@ -13,23 +13,28 @@ const ZONES = [
 let map, circles = {}, rpiMarkers = {}, nameLabels = {}, heatLayer = null, timelineChart;
 let currentTime = 14;
 let selectedZoneId = 'Z4';
-let currentScenario = 'monsoon';
+let currentScenario = 'mixed';
 let lastState = null;
+let overlapGroups = [];
+let routeLayer = null;
+let dashboardMode = 'consumer';
 
 const SCENARIOS = {
+    'mixed': { name: 'Mixed Impact Demo', desc: 'Custom simulation designed to show all flood severities simultaneously.', rain_max: 42, rain_peak: 12.6, tide: 1.8, wind: 25 },
     'monsoon': { name: 'Monsoon Surge', desc: 'Heavy sustained rainfall (180mm) combined with high spring tide (1.8m).', rain_max: 180, rain_peak: 45, tide: 1.8, wind: 45 },
     'cyclone': { name: 'Cyclone Landfall', desc: 'Extreme short-duration rain (250mm) and massive storm surge (2.8m).', rain_max: 250, rain_peak: 80, tide: 2.8, wind: 120 },
     'king_tide': { name: 'King Tide + Rain', desc: 'Minimal rain (40mm) but exceptionally high astronomical tide (2.2m).', rain_max: 40, rain_peak: 10, tide: 2.2, wind: 20 },
     'cloudburst': { name: 'Urban Cloudburst', desc: 'Sudden, extreme localized rainfall (120mm in 2 hrs) during low tide.', rain_max: 120, rain_peak: 90, tide: 0.5, wind: 35 },
-    'calm': { name: 'Baseline Conditions', desc: 'Normal sunny day. No significant weather events.', rain_max: 0, rain_peak: 0, tide: 0.8, wind: 10 }
+    'calm': { name: 'Baseline Conditions', desc: 'Normal sunny day. No significant weather events.', rain_max: 0, rain_peak: 0, tide: 0.8, wind: 10 },
+    'live': { name: 'Live Terminal Simulation', desc: 'Waiting for terminal input...', rain_max: 0, rain_peak: 0, tide: 0.8, wind: 10 }
 };
 
 // Severity mapping
 function getSeverity(depth) {
-    if (depth < 0.1)  return { label: 'LOW',      color: '#00F0FF', css: 'bg-low' };
-    if (depth < 0.4)  return { label: 'MODERATE',  color: '#FFC000', css: 'bg-moderate' };
-    if (depth < 0.8)  return { label: 'HIGH',      color: '#FF3366', css: 'bg-high' };
-    return                    { label: 'SEVERE',    color: '#FF003C', css: 'bg-severe' };
+    if (depth < 0.1)  return { label: 'LOW',       color: '#00F0FF', css: 'bg-low' };       // Blue
+    if (depth < 0.30) return { label: 'MODERATE',  color: '#FFC000', css: 'bg-moderate' };  // Yellow
+    if (depth < 1.2)  return { label: 'HIGH',      color: '#FF7000', css: 'bg-high' };      // Orange
+    return            { label: 'SEVERE',    color: '#FF003C', css: 'bg-severe' };    // Red
 }
 
 function formatTime(hr) {
@@ -46,6 +51,7 @@ function initMap() {
     }
 
     map = L.map('map', { zoomControl: false }).setView([12.88, 74.83], 12);
+    routeLayer = L.geoJSON(null, { style: { color: '#55e39b', weight: 5, opacity: 0.9 } }).addTo(map);
     
     // Base layers
     const darkLayer = L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
@@ -98,6 +104,14 @@ function initMap() {
         nameLabels[z.id] = L.marker([z.lat - 0.008, z.lon], {
             icon: L.divIcon({ className: 'zone-label', html: z.name, iconSize: [80, 14], iconAnchor: [40, 7] })
         }).addTo(map);
+    });
+
+    map.on('click', event => {
+        const routeTab = document.getElementById('tab-route');
+        if (!routeTab.classList.contains('active')) return;
+        const prefix = dashboardMode === 'ngo' ? 'ngo' : 'route';
+        document.getElementById(`${prefix}-lat`).value = event.latlng.lat.toFixed(5);
+        document.getElementById(`${prefix}-lon`).value = event.latlng.lng.toFixed(5);
     });
 
     // Fix for Leaflet sometimes rendering gray tiles inside flex containers on initial load
@@ -163,6 +177,8 @@ async function computeState(time) {
 async function updateUI() {
     const state = await computeState(currentTime);
     lastState = state;
+    overlapGroups = findOverlapGroups(state);
+    const overlapMembers = new Set(overlapGroups.flat());
 
     // -- Top strip & Overlay --
     document.getElementById('sim-clock').textContent = `${currentTime.toString().padStart(2,'0')}:00`;
@@ -197,7 +213,8 @@ async function updateUI() {
                     fillColor: s.sev.color,
                     fillOpacity: 0.15 + Math.min(0.4, s.depth * 0.3),
                     color: selectedZoneId === s.id ? '#00D4FF' : s.sev.color,
-                    weight: selectedZoneId === s.id ? 3 : 1
+                    weight: selectedZoneId === s.id ? 3 : overlapMembers.has(s.id) ? 2 : 1,
+                    dashArray: overlapMembers.has(s.id) ? '5 4' : null
                 });
             }
 
@@ -251,20 +268,7 @@ async function updateUI() {
     `).join('');
 
     // -- RESPONSE tab --
-    const resp = state.filter(s => s.rpi > 0.5).sort((a,b) => b.rpi - a.rpi);
-    document.getElementById('response-list').innerHTML = resp.map((s,i) => `
-        <div class="resp-card">
-            <div class="resp-rank">${i+1}</div>
-            <div class="resp-body">
-                <div class="resp-name">${s.name} <span class="${s.sev.css}" style="margin-left:6px">${s.sev.label}</span></div>
-                <div class="resp-detail">
-                    RPI: <span class="mono text-accent">${s.rpi.toFixed(1)}</span> |
-                    Depth: <span class="mono">${s.depth.toFixed(2)}m</span> (${s.depth_p10?.toFixed(2) || '?'}–${s.depth_p90?.toFixed(2) || '?'}m range)<br>
-                    Facilities at risk: ${s.facilities}
-                </div>
-            </div>
-        </div>
-    `).join('');
+    renderResponseList(state);
 
     // -- WHY tab --
     const select = document.getElementById('zone-select');
@@ -281,6 +285,7 @@ async function updateUI() {
 
     const categoryColors = { weather:'cat-weather', marine:'cat-marine', terrain:'cat-terrain', landuse:'cat-landuse', infrastructure:'cat-infrastructure' };
 
+    const drivers = sel.drivers || [];
     document.getElementById('why-content').innerHTML = `
         <div class="why-summary">
             <div style="margin-bottom:8px">
@@ -299,18 +304,24 @@ async function updateUI() {
                 ${sel.summary || 'No driver data available.'}
             </div>
         </div>
-        ${(sel.drivers || []).map(d => `
-            <div class="why-driver">
-                <div class="why-driver-header">
-                    <span class="why-driver-name">${d.name}</span>
-                    <span class="why-driver-pct">${d.pct}%</span>
-                </div>
-                <div class="why-driver-bar">
-                    <div class="why-driver-fill ${categoryColors[d.category] || 'cat-weather'}" style="width:${d.pct}%"></div>
-                </div>
-                <div class="why-driver-detail">${d.detail}</div>
+        ${drivers.length ? `
+            <div class="why-stack" role="img" aria-label="Stacked contribution bar for the listed flood drivers">
+                ${drivers.map(d => `<span class="why-driver-fill ${categoryColors[d.category] || 'cat-weather'}" style="width:${d.pct}%" title="${d.name}: ${d.pct}%"></span>`).join('')}
             </div>
-        `).join('')}
+            <div class="why-driver-list">
+                ${drivers.map(d => `
+                    <div class="why-driver">
+                        <div class="why-driver-header">
+                            <span class="why-driver-name"><i class="why-key ${categoryColors[d.category] || 'cat-weather'}"></i>${d.name}</span>
+                            <span class="why-driver-pct">${d.pct}%</span>
+                        </div>
+                        <div class="why-driver-detail">${d.detail}</div>
+                    </div>
+                `).join('')}
+            </div>
+            <div class="why-footnote">Relative driver weights, normalized to 100%; these are explanatory weights, not independent probabilities.</div>
+        ` : '<div class="why-empty">No driver breakdown is available for this zone.</div>'}
+        ${overlapGroups.some(group => group.includes(sel.id)) ? `<div class="overlap-note"><strong>Overlapping model coverage</strong><br>${overlapGroups.find(group => group.includes(sel.id)).map(id => ZONES.find(z => z.id === id).name).join(' · ')} share approximate 1.4 km zone circles. Their boundaries are not observed flood extents.</div>` : ''}
     `;
 
     // -- SAFETY tab --
@@ -332,29 +343,39 @@ async function updateUI() {
     }).join('');
 
     // -- STATS tab --
-    const totalPopAtRisk = state.filter(s => s.depth > 0.3).reduce((sum, s) => sum + s.pop, 0);
-    const totalImpassable = state.filter(s => s.depth > 0.4).length;
+    const affected = state.filter(s => s.depth >= 0.05);
+    const highOrSevere = state.filter(s => s.depth >= 0.3);
+    const meanProbability = state.length ? state.reduce((sum, zone) => sum + zone.p, 0) / state.length : 0;
+    const statDetails = {
+        affected: `Count of modeled zone records with peak depth at least 0.05 m: ${affected.map(zone => zone.name).join(', ') || 'none'}. A zone count is not a count of streets or unique geographic area.`,
+        high: `Count of zone records with modeled peak depth at least 0.30 m: ${highOrSevere.map(zone => `${zone.name} (${zone.depth.toFixed(2)} m)`).join(', ') || 'none'}. This is a model threshold, not a road-closure observation.`,
+        overlaps: `Connected groups of affected 1.4 km model circles whose centers are less than 2.8 km apart: ${overlapGroups.map(group => group.map(id => ZONES.find(zone => zone.id === id).name).join(' + ')).join('; ') || 'none'}. Overlap is approximate and populations are not added across these groups.`,
+        probability: `Unweighted mean of the current model flood probabilities across ${state.length} configured demo zones: ${(meanProbability * 100).toFixed(1)}%. This is not population-weighted and is not a citywide calibrated estimate.`,
+        selectedDepth: `${sel.name}: modeled peak depth ${sel.depth.toFixed(2)} m; uncertainty interval ${sel.depth_p10?.toFixed(2) ?? '?'}–${sel.depth_p90?.toFixed(2) ?? '?'} m.`,
+        selectedPopulation: `${sel.name}: ${sel.pop.toLocaleString()} is the configured demo population estimate for this zone. It is not a live census count; adjacent zone populations are not summed because their boundaries overlap.`
+    };
     
     document.getElementById('stats-content').innerHTML = `
-        <div class="stat-card">
-            <div class="stat-value">${totalPopAtRisk.toLocaleString()}</div>
-            <div class="stat-label">Population at Risk (Depth > 0.3m)</div>
+        <div class="stats-heading">CURRENT MODEL SNAPSHOT</div>
+        <div class="stat-row">
+            <div class="stat-card"><button class="stat-value" data-stat="affected" type="button">${affected.length}</button><div class="stat-label">Zones ≥ 0.05 m</div></div>
+            <div class="stat-card"><button class="stat-value" data-stat="high" type="button">${highOrSevere.length}</button><div class="stat-label">Zones ≥ 0.30 m</div></div>
         </div>
         <div class="stat-row">
-            <div class="stat-card">
-                <div class="stat-value">${sevCount}</div>
-                <div class="stat-label">Severe Zones</div>
-            </div>
-            <div class="stat-card">
-                <div class="stat-value">${totalImpassable}</div>
-                <div class="stat-label">Impassable Roads</div>
-            </div>
+            <div class="stat-card"><button class="stat-value" data-stat="overlaps" type="button">${overlapGroups.length}</button><div class="stat-label">Overlap groups</div></div>
+            <div class="stat-card"><button class="stat-value" data-stat="probability" type="button">${(meanProbability * 100).toFixed(0)}%</button><div class="stat-label">Mean zone probability</div></div>
         </div>
-        <div class="stat-card">
-            <div class="stat-value">${(state.reduce((a,b)=>a+b.p,0)/state.length*100).toFixed(0)}%</div>
-            <div class="stat-label">Average Flood Probability</div>
+        <div class="stats-heading">SELECTED ZONE: ${sel.name}</div>
+        <div class="stat-row">
+            <div class="stat-card"><button class="stat-value" data-stat="selectedDepth" type="button">${sel.depth.toFixed(2)}m</button><div class="stat-label">Peak depth</div></div>
+            <div class="stat-card"><button class="stat-value" data-stat="selectedPopulation" type="button">${sel.pop.toLocaleString()}</button><div class="stat-label">Demo population</div></div>
         </div>
+        <div id="stat-detail" class="stat-detail" aria-live="polite">Select a value for its definition, threshold, and limitations.</div>
     `;
+    document.querySelectorAll('.stat-value').forEach(button => {
+        button.title = statDetails[button.dataset.stat];
+        button.addEventListener('click', () => { document.getElementById('stat-detail').textContent = statDetails[button.dataset.stat]; });
+    });
 
     // -- Chart annotation --
     if (timelineChart) {
@@ -368,6 +389,211 @@ function selectZone(id) {
     selectedZoneId = id;
     updateUI();
 }
+
+function findOverlapGroups(state) {
+    const affected = state.filter(zone => zone.depth >= 0.05);
+    const remaining = new Set(affected.map(zone => zone.id));
+    const groups = [];
+    while (remaining.size) {
+        const firstId = remaining.values().next().value;
+        remaining.delete(firstId);
+        const group = [firstId];
+        for (let index = 0; index < group.length; index++) {
+            const current = ZONES.find(zone => zone.id === group[index]);
+            for (const candidateId of [...remaining]) {
+                const candidate = ZONES.find(zone => zone.id === candidateId);
+                if (distanceMeters(current, candidate) < 2800) {
+                    remaining.delete(candidateId);
+                    group.push(candidateId);
+                }
+            }
+        }
+        if (group.length > 1) groups.push(group);
+    }
+    return groups;
+}
+
+function distanceMeters(a, b) {
+    const radians = value => value * Math.PI / 180;
+    const latDelta = radians(b.lat - a.lat);
+    const lonDelta = radians(b.lon - a.lon);
+    const haversine = Math.sin(latDelta / 2) ** 2 + Math.cos(radians(a.lat)) * Math.cos(radians(b.lat)) * Math.sin(lonDelta / 2) ** 2;
+    return 6371000 * 2 * Math.atan2(Math.sqrt(haversine), Math.sqrt(1 - haversine));
+}
+
+function renderResponseList(state) {
+    const responseZones = state.filter(zone => zone.rpi > 0.5).sort((a, b) => b.rpi - a.rpi);
+    document.getElementById('response-list').innerHTML = responseZones.map((zone, index) => `
+        <button type="button" class="resp-card" onclick="selectZone('${zone.id}')">
+            <span class="resp-rank">${index + 1}</span>
+            <span class="resp-body">
+                <span class="resp-name">${zone.name} <span class="${zone.sev.css}" style="margin-left:6px">${zone.sev.label}</span></span>
+                <span class="resp-detail">
+                    Demo RPI proxy: <span class="mono text-accent" title="Flood probability × modeled peak depth in metres × 100">${zone.rpi.toFixed(1)}</span> |
+                    Depth: <span class="mono">${zone.depth.toFixed(2)}m</span> (${zone.depth_p10?.toFixed(2) || '?'}–${zone.depth_p90?.toFixed(2) || '?'}m range)<br>
+                    Facilities noted: ${zone.facilities || 'none configured'}
+                </span>
+            </span>
+        </button>
+    `).join('') || '<div class="why-empty">No zones currently meet the response-list threshold.</div>';
+}
+
+function getRouteOrigin(prefix) {
+    const latitudeText = document.getElementById(`${prefix}-lat`).value.trim();
+    const longitudeText = document.getElementById(`${prefix}-lon`).value.trim();
+    if (!latitudeText || !longitudeText) throw new Error('Enter a starting location or use device location.');
+    const latitude = Number(latitudeText);
+    const longitude = Number(longitudeText);
+    if (!Number.isFinite(latitude) || !Number.isFinite(longitude) || Math.abs(latitude) > 90 || Math.abs(longitude) > 180) {
+        throw new Error('Enter valid decimal-degree latitude and longitude, or use device location.');
+    }
+    return { lat: latitude, lon: longitude };
+}
+
+function useDeviceLocation(prefix, statusId) {
+    const status = document.getElementById(statusId);
+    if (!navigator.geolocation) {
+        status.textContent = 'Location is not available in this browser. Enter coordinates manually.';
+        return;
+    }
+    status.textContent = 'Waiting for location permission…';
+    navigator.geolocation.getCurrentPosition(position => {
+        document.getElementById(`${prefix}-lat`).value = position.coords.latitude.toFixed(5);
+        document.getElementById(`${prefix}-lon`).value = position.coords.longitude.toFixed(5);
+        status.textContent = 'Starting point set from device location.';
+    }, () => { status.textContent = 'Could not read location. Enter coordinates manually.'; }, { enableHighAccuracy: true, timeout: 10000 });
+}
+
+async function fetchMappedShelters(origin) {
+    const query = `[out:json][timeout:20];(nwr["amenity"="shelter"](around:10000,${origin.lat},${origin.lon});nwr["emergency"="shelter"](around:10000,${origin.lat},${origin.lon}););out center tags;`;
+    const response = await fetch('https://overpass-api.de/api/interpreter', {
+        method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded;charset=UTF-8' }, body: `data=${encodeURIComponent(query)}`
+    });
+    if (!response.ok) throw new Error('OpenStreetMap shelter lookup is unavailable right now.');
+    const data = await response.json();
+    return data.elements.map(element => ({
+        id: element.id,
+        name: element.tags?.name || `Mapped shelter (OSM ${element.id})`,
+        lat: element.lat ?? element.center?.lat,
+        lon: element.lon ?? element.center?.lon
+    })).filter(place => Number.isFinite(place.lat) && Number.isFinite(place.lon))
+        .sort((a, b) => distanceMeters(origin, a) - distanceMeters(origin, b)).slice(0, 5);
+}
+
+async function requestOsrmRoutes(origin, destination) {
+    const url = `https://router.project-osrm.org/route/v1/driving/${origin.lon},${origin.lat};${destination.lon},${destination.lat}?alternatives=3&overview=full&geometries=geojson&steps=false`;
+    const response = await fetch(url);
+    if (!response.ok) throw new Error('OSRM routing service is unavailable.');
+    const data = await response.json();
+    if (data.code !== 'Ok' || !data.routes?.length) return [];
+    return data.routes;
+}
+
+function routeFloodHits(route, state, ignoredZoneId = null) {
+    const exposedZones = state.filter(zone => zone.depth >= 0.1 && zone.id !== ignoredZoneId);
+    const hits = new Set();
+    const coordinates = route.geometry.coordinates;
+    const sampledCoordinates = [];
+    for (let index = 0; index < coordinates.length - 1; index++) {
+        const start = { lat: coordinates[index][1], lon: coordinates[index][0] };
+        const end = { lat: coordinates[index + 1][1], lon: coordinates[index + 1][0] };
+        const steps = Math.max(1, Math.ceil(distanceMeters(start, end) / 400));
+        for (let step = 0; step < steps; step++) {
+            const fraction = step / steps;
+            sampledCoordinates.push([
+                start.lon + (end.lon - start.lon) * fraction,
+                start.lat + (end.lat - start.lat) * fraction
+            ]);
+        }
+    }
+    if (coordinates.length) sampledCoordinates.push(coordinates[coordinates.length - 1]);
+    for (const [longitude, latitude] of sampledCoordinates) {
+        for (const zone of exposedZones) {
+            if (distanceMeters({ lat: latitude, lon: longitude }, zone) <= 1400) hits.add(zone.name);
+        }
+    }
+    return [...hits];
+}
+
+function displayRoute(route, destination, statusId, note = '') {
+    if (!map || !routeLayer) throw new Error('The map is unavailable, so the route cannot be drawn.');
+    routeLayer.clearLayers();
+    routeLayer.addData({ type: 'Feature', properties: {}, geometry: route.geometry });
+    map.fitBounds(routeLayer.getBounds(), { padding: [40, 40], maxZoom: 15 });
+    document.getElementById(statusId).textContent = `${destination} · ${(route.distance / 1000).toFixed(1)} km · about ${Math.round(route.duration / 60)} min. ${note}`;
+}
+
+async function findConsumerRoute() {
+    const status = document.getElementById('consumer-route-status');
+    try {
+        const origin = getRouteOrigin('route');
+        status.textContent = 'Looking up mapped shelters and screening OSRM routes…';
+        const shelters = await fetchMappedShelters(origin);
+        if (!shelters.length) throw new Error('No OSM-tagged shelters were found within 10 km. No destination was invented.');
+        const state = lastState || await computeState(currentTime);
+        const candidates = [];
+        for (const shelter of shelters) {
+            const routes = await requestOsrmRoutes(origin, shelter);
+            for (const route of routes) {
+                const floodedZones = routeFloodHits(route, state);
+                if (!floodedZones.length) candidates.push({ shelter, route });
+            }
+        }
+        candidates.sort((a, b) => a.route.duration - b.route.duration);
+        if (!candidates.length) throw new Error('No screened route avoids all modeled flooded zones. Do not attempt travel through floodwater; follow emergency services.');
+        const best = candidates[0];
+        displayRoute(best.route, best.shelter.name, 'consumer-route-status', 'OSM-mapped shelter; opening status unverified.');
+    } catch (error) {
+        routeLayer?.clearLayers();
+        status.textContent = error.message;
+    }
+}
+
+async function planNgoRoute() {
+    const status = document.getElementById('ngo-route-status');
+    try {
+        const origin = getRouteOrigin('ngo');
+        const state = lastState || await computeState(currentTime);
+        const targets = state.filter(zone => zone.depth >= 0.05).sort((a, b) => b.rpi - a.rpi);
+        if (!targets.length) throw new Error('No modeled zones currently meet the dispatch threshold.');
+        status.textContent = 'Ranking affected zones by demo RPI and screening OSRM alternatives…';
+        for (const target of targets) {
+            const routes = await requestOsrmRoutes(origin, target);
+            const feasible = routes.filter(route => routeFloodHits(route, state, target.id).length === 0)
+                .sort((a, b) => a.duration - b.duration);
+            if (feasible.length) {
+                selectedZoneId = target.id;
+                updateUI();
+                displayRoute(feasible[0], `${target.name} · RPI proxy ${target.rpi.toFixed(1)}`, 'ngo-route-status', 'Route screens other modeled zones; final access inside target zone is unverified.');
+                return;
+            }
+        }
+        throw new Error('No screened approach route found for affected zones. Do not dispatch through modeled flooded areas; verify conditions with local responders.');
+    } catch (error) {
+        routeLayer?.clearLayers();
+        status.textContent = error.message;
+    }
+}
+
+function setDashboardMode(mode) {
+    dashboardMode = mode;
+    document.body.classList.toggle('ngo-mode', mode === 'ngo');
+    document.querySelectorAll('.dashboard-mode').forEach(button => button.classList.toggle('active', button.dataset.mode === mode));
+    document.querySelectorAll('.tab').forEach(tab => tab.classList.toggle('mode-hidden', mode === 'ngo' && !['tab-response', 'tab-route'].includes(tab.dataset.target)));
+    const selectedTab = mode === 'ngo' ? 'tab-response' : 'tab-alerts';
+    document.querySelectorAll('.tab').forEach(tab => tab.classList.toggle('active', tab.dataset.target === selectedTab));
+    document.querySelectorAll('.tab-content').forEach(panel => panel.classList.toggle('active', panel.id === selectedTab));
+    document.getElementById('consumer-route').hidden = mode !== 'consumer';
+    document.getElementById('ngo-route').hidden = mode !== 'ngo';
+    document.querySelector('[data-target="tab-response"]').textContent = mode === 'ngo' ? 'DISPATCH QUEUE' : 'RESPONSE';
+}
+
+document.querySelectorAll('.dashboard-mode').forEach(button => button.addEventListener('click', () => setDashboardMode(button.dataset.mode)));
+document.getElementById('use-location').addEventListener('click', () => useDeviceLocation('route', 'consumer-route-status'));
+document.getElementById('ngo-use-location').addEventListener('click', () => useDeviceLocation('ngo', 'ngo-route-status'));
+document.getElementById('find-shelter-route').addEventListener('click', findConsumerRoute);
+document.getElementById('plan-rescue-route').addEventListener('click', planNgoRoute);
+setDashboardMode('consumer');
 
 // Chart
 function initChart() {
@@ -438,4 +664,41 @@ document.getElementById('scenario-select').addEventListener('change', e => {
 });
 
 // Boot
-window.onload = () => { initMap(); initChart(); updateUI(); };
+let lastLiveId = -1;
+function startLivePolling() {
+    setInterval(async () => {
+        try {
+            const apiUrl = window.location.protocol === 'file:' 
+                ? 'http://127.0.0.1:8080/api/scenario' 
+                : '/api/scenario';
+            const res = await fetch(apiUrl);
+            const data = await res.json();
+            
+            if (data.id > lastLiveId) {
+                lastLiveId = data.id;
+                
+                // Update live scenario data
+                SCENARIOS['live'] = {
+                    name: data.name,
+                    desc: data.desc,
+                    rain_max: data.rain_max,
+                    rain_peak: data.rain_peak,
+                    tide: data.tide,
+                    wind: data.wind
+                };
+                
+                // Force switch to live scenario
+                currentScenario = 'live';
+                document.getElementById('scenario-select').value = 'live';
+                
+                // Re-render
+                updateChartData();
+                updateUI();
+            }
+        } catch (e) {
+            // Silently ignore if offline
+        }
+    }, 2000);
+}
+
+window.onload = () => { initMap(); initChart(); updateUI(); startLivePolling(); };

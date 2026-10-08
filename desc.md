@@ -12,8 +12,19 @@ Current early-warning systems are too broad and rely heavily on active cloud con
 
 **Poseidon's USP is its offline-first, hyper-local dispatch capability.** 
 1. **No Cloud Dependency:** It runs entirely on a single local machine (laptop-first) using zero paid APIs. 
-2. **Actionable Translation:** It doesn't just predict water depth; it translates physics into actionable intelligence, explicitly flagging impassable roads, exposed critical facilities (like hospitals), and generating a Responder Priority Index (RPI) to dictate exact deployment orders.
-3. **Plain-Language Explainability:** Complex model weights are automatically converted into readable driver percentages (e.g. "60% Rainfall, 40% Tidal Surge") so dispatchers understand *why* an alert is generated.
+2. **Real-Time Terminal Sync:** Poseidon acts as a command center. You can run localized weather simulations via the terminal (`python live_simulate.py`), and the dashboard UI will automatically intercept the payload and visually render the impact without a single browser refresh.
+3. **Actionable Translation:** It doesn't just predict water depth; it translates physics into actionable intelligence, explicitly flagging impassable roads, exposed critical facilities (like hospitals), and generating a Responder Priority Index (RPI) to dictate exact deployment orders.
+4. **Plain-Language Explainability:** Complex model weights are automatically converted into readable driver percentages (e.g. "60% Rainfall, 40% Tidal Surge") so dispatchers understand *why* an alert is generated.
+
+---
+
+## 🌟 Key Features
+
+1. **Live Simulation Injection:** Instantly test edge-case weather scenarios directly from the CLI. Trigger pre-built presets (Low, Medium, High, Severe, Mixed) and watch the map dynamically redraw flood zones.
+2. **Micro-Topography Physics Engine (`Poseidon-Sim`):** Generates highly localized flood risk based on exact zone elevations, coastal proximity, and drainage capacity, producing beautifully mixed predictions across the map (e.g., High-elevation zones stay safe while low-lying sinks flood).
+3. **Explainable AI Engine:** Breaks down the exact percentage of why a zone flooded (e.g., "30% High Tide Blocking Drainage", "25% High Concrete Cover").
+4. **Responder Priority Index (RPI):** Automatically ranks zones by urgency, factoring in population density and critical infrastructure, generating an ordered hit-list for emergency deployment.
+5. **Hyper-Local Household Advisor:** Outputs a definitive binary safety action per zone: `SAFE TO STAY`, `PREPARE TO LEAVE`, or `EVACUATE NOW`.
 
 ---
 

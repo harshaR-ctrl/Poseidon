@@ -23,33 +23,38 @@ def get_safety_verdict(p_flood, depth, onset_hr):
     """
     Generates a household safety verdict: EVACUATE NOW, PREPARE TO LEAVE, or SAFE TO STAY.
     """
-    if depth >= 0.6 and p_flood >= 0.7:
+    if depth >= 1.2 and p_flood >= 0.7:
         hours_left = max(0, onset_hr - 14)  # relative to "now"
+        if hours_left == 0:
+            time_warning = "Street-level flooding is imminent or already underway."
+        elif hours_left == 1:
+            time_warning = "You have less than 1 hour to evacuate before roads become impassable."
+        else:
+            time_warning = f"You have approximately {hours_left:.0f} hours to safely evacuate."
+            
         return {
             "level": "EVACUATE",
             "label": "EVACUATE NOW",
-            "message": f"Predicted water depth of {depth:.1f}m will make roads impassable. "
-                       f"You have approximately {hours_left:.0f} hours before water reaches street level. "
-                       f"Move to higher ground or designated shelter immediately.",
-            "action": "Leave the area via elevated routes. Do not attempt to cross flooded roads.",
+            "message": f"CRITICAL DANGER: Predicted water depths of {depth:.1f}m will severely flood homes and trap residents. {time_warning}",
+            "action": "Evacuate immediately to higher ground. Do not drive or walk through floodwaters.",
             "color": "#FF003C"
         }
     elif depth >= 0.3 and p_flood >= 0.5:
+        hours_left = max(0, onset_hr - 14)
+        time_warning = "Water levels are actively rising." if hours_left == 0 else f"Impact expected in approximately {hours_left:.0f} hours."
         return {
             "level": "PREPARE",
             "label": "PREPARE TO LEAVE",
-            "message": f"Moderate flooding of {depth:.1f}m is likely. Ground floors will be affected. "
-                       f"Prepare an emergency bag and monitor updates every 30 minutes.",
-            "action": "Move valuables to upper floors. Identify your nearest exit route and shelter.",
-            "color": "#FF3366"
+            "message": f"WARNING: Moderate flooding up to {depth:.1f}m is likely. Ground floors and access roads will be affected. {time_warning}",
+            "action": "Pack an emergency bag, move valuables to upper floors, and monitor updates closely.",
+            "color": "#FF7000"
         }
     elif depth >= 0.1 and p_flood >= 0.3:
         return {
             "level": "ALERT",
             "label": "STAY ALERT",
-            "message": f"Minor flooding of {depth:.1f}m is possible. Unlikely to require evacuation "
-                       f"but low-lying parking and basements may be affected.",
-            "action": "Move vehicles from underground parking. Avoid low-lying walkways.",
+            "message": f"Minor pooling of {depth:.1f}m is possible. Evacuation is not currently required, but low-lying basements and parking areas may flood.",
+            "action": "Move vehicles from underground parking and avoid driving through localized puddles.",
             "color": "#FFC000"
         }
     else:
@@ -65,6 +70,34 @@ def get_safety_verdict(p_flood, depth, onset_hr):
 @app.route('/api/ping', methods=['GET'])
 def ping():
     return jsonify({"status": "ok"})
+
+# Live Simulation State
+current_live_scenario = {
+    "id": 0,
+    "name": "Live Terminal Simulation",
+    "desc": "Waiting for terminal input...",
+    "rain_max": 0,
+    "rain_peak": 0,
+    "tide": 0.8,
+    "wind": 10
+}
+
+@app.route('/api/scenario', methods=['GET'])
+def get_scenario():
+    return jsonify(current_live_scenario)
+
+@app.route('/api/scenario', methods=['POST'])
+def set_scenario():
+    global current_live_scenario
+    data = request.json
+    current_live_scenario["id"] += 1
+    current_live_scenario["name"] = data.get("name", "Live Terminal Simulation")
+    current_live_scenario["desc"] = data.get("desc", "Triggered via CLI.")
+    current_live_scenario["rain_max"] = float(data.get("rain_max", 0))
+    current_live_scenario["rain_peak"] = float(data.get("rain_peak", 0))
+    current_live_scenario["tide"] = float(data.get("tide", 0.8))
+    current_live_scenario["wind"] = float(data.get("wind", 10))
+    return jsonify({"status": "updated", "scenario": current_live_scenario})
 
 # API: Model Inference
 @app.route('/api/predict', methods=['POST'])

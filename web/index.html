@@ -15,7 +15,9 @@
         <div class="strip-center">
             <span class="text-muted">MANGALURU COASTAL SECTOR</span>
             <select id="scenario-select" class="scenario-select">
-                <option value="monsoon">Monsoon Surge (Active)</option>
+                <option value="live" style="color: #FF3366; font-weight: bold;">🔴 LIVE: Terminal Link</option>
+                <option value="mixed" selected>Mixed Impact Demo (Active)</option>
+                <option value="monsoon">Monsoon Surge</option>
                 <option value="cyclone">Cyclone Landfall</option>
                 <option value="king_tide">King Tide + Rain</option>
                 <option value="cloudburst">Urban Cloudburst</option>
@@ -23,6 +25,10 @@
             </select>
         </div>
         <div class="strip-right">
+            <div class="dashboard-switch" role="group" aria-label="Dashboard">
+                <button type="button" class="dashboard-mode active" data-mode="consumer">HOUSEHOLD</button>
+                <button type="button" class="dashboard-mode" data-mode="ngo">NGO DISPATCH</button>
+            </div>
             <span id="sim-clock" class="mono text-accent">14:00</span>
             <span id="status-label" class="status-pill"></span>
         </div>
@@ -95,6 +101,7 @@
                     <div class="tab" data-target="tab-why">WHY</div>
                     <div class="tab" data-target="tab-safety">SAFETY</div>
                     <div class="tab" data-target="tab-stats">STATS</div>
+                    <div class="tab" data-target="tab-route">ROUTE</div>
                 </div>
 
                 <div id="tab-alerts" class="tab-content active">
@@ -118,6 +125,32 @@
 
                 <div id="tab-stats" class="tab-content">
                     <div id="stats-content"></div>
+                </div>
+
+                <div id="tab-route" class="tab-content">
+                    <section class="route-workspace" id="consumer-route">
+                        <h2>Evacuation route</h2>
+                        <p>Route to an OpenStreetMap-mapped shelter only. A mapped shelter is not confirmation that it is open or officially designated for this event.</p>
+                        <div class="route-coordinate-row">
+                            <label>Start latitude<input id="route-lat" inputmode="decimal" placeholder="Use location or enter latitude"></label>
+                            <label>Start longitude<input id="route-lon" inputmode="decimal" placeholder="Enter longitude"></label>
+                        </div>
+                        <button type="button" class="route-action" id="use-location">Use my location</button>
+                        <button type="button" class="route-action primary" id="find-shelter-route">Find nearest mapped shelter</button>
+                        <div id="consumer-route-status" class="route-status" aria-live="polite">No route requested.</div>
+                    </section>
+                    <section class="route-workspace" id="ngo-route">
+                        <h2>Rescue dispatch</h2>
+                        <p>Dispatch order uses the demo RPI proxy (flood probability × modeled peak depth). Routes avoid other modeled flooded zones where OSRM offers an alternative; access inside the target zone is not verified.</p>
+                        <div class="route-coordinate-row">
+                            <label>Team base latitude<input id="ngo-lat" inputmode="decimal" placeholder="Use location or enter latitude"></label>
+                            <label>Team base longitude<input id="ngo-lon" inputmode="decimal" placeholder="Enter longitude"></label>
+                        </div>
+                        <button type="button" class="route-action" id="ngo-use-location">Use my location</button>
+                        <button type="button" class="route-action primary" id="plan-rescue-route">Plan highest-priority route</button>
+                        <div id="ngo-route-status" class="route-status" aria-live="polite">No dispatch route requested.</div>
+                    </section>
+                    <p class="route-caveat">Prototype screening only. OSRM uses public road data; zone circles are approximate and do not confirm road-level water depth or live closures. Never enter floodwater; follow local emergency services.</p>
                 </div>
             </div>
         </div>

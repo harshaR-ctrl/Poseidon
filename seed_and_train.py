@@ -16,9 +16,8 @@ def run_seed_and_train():
     logger.info("Starting End-to-End Seed and Train Process...")
     
     # 1. Generate Zones and Synthetic Terrain (F1)
-    logger.info("--- STEP 1: Generating 12 H3 Zones and Terrain Features ---")
-    bbox = (12.80, 74.79, 12.98, 74.89)  # Adjusted bbox for Mangaluru coast
-    zones = features.generate_h3_zones(bbox, resolution=9)[:12]  # Limit to 12 zones for demo
+    logger.info("--- STEP 1: Generating Exact UI Zones and Terrain Features ---")
+    zones = features.generate_h3_zones()
     features.build_terrain_features(zones)
     
     # 2. Simulate 500 Historical Events (F2)
