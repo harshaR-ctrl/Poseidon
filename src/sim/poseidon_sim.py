@@ -128,17 +128,32 @@ def generate_scenarios(n_scenarios=10, output_dir="data/cache/replay"):
     
     logger.info(f"Generating {n_scenarios} scenarios...")
     for ev in tqdm(range(n_scenarios)):
-        # Synthetic rain curve (bell shape) - increased to 250 to cover cyclone scenarios
-        peak_rain = np.random.uniform(5, 250)
+        
+        # Scenario probability distribution: 60% mild, 30% moderate, 10% extreme
+        rand_val = np.random.random()
+        
+        if rand_val < 0.6:
+            # Mild/Normal Day (minimal to no flooding)
+            peak_rain = np.random.uniform(0, 30)
+            tide_amp = np.random.uniform(0.5, 1.2)
+            surge = np.random.uniform(0, 0.2)
+        elif rand_val < 0.9:
+            # Moderate Event (Monsoon showers)
+            peak_rain = np.random.uniform(30, 90)
+            tide_amp = np.random.uniform(1.0, 1.8)
+            surge = np.random.uniform(0.2, 0.8)
+        else:
+            # Extreme Event (Cyclone / Severe Monsoon)
+            peak_rain = np.random.uniform(90, 250)
+            tide_amp = np.random.uniform(1.5, 2.8)
+            surge = np.random.uniform(0.8, 2.5)
+
         peak_hour = np.random.randint(4, 20)
         rain_curve = peak_rain * np.exp(-0.1 * (np.arange(24) - peak_hour)**2)
         
         # Synthetic tide curve (sine wave)
-        tide_amp = np.random.uniform(0.5, 3.5)
         tide_phase = np.random.uniform(0, 2 * np.pi)
         tide_curve = tide_amp * np.sin(np.arange(24) * 2 * np.pi / 12.42 + tide_phase) + 1.0
-        
-        surge = np.random.uniform(0, 2.5)
         
         res = sim.simulate_event(f"evt_{ev}", rain_curve, tide_curve, surge)
         all_results.extend(res)

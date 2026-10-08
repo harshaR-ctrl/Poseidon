@@ -44,21 +44,36 @@ def generate_h3_zones(bbox=None, resolution=9, output_dir="data/processed"):
     logger.info(f"Generated {len(zones)} UI zones and saved to zones.parquet.")
     return gdf_zones
 
+ZONE_TERRAIN = {
+    # slope_mean: degrees of local slope (flat coast vs hilly inland)
+    # sink_depth: depth of topographic depression that collects water (m)
+    'Z0': {'slope': 0.5, 'sink': 0.25},   # PANAMBUR - flat coastal, significant sink
+    'Z1': {'slope': 2.8, 'sink': 0.08},   # SURATHKAL - NITK campus, sloped hillside
+    'Z2': {'slope': 0.8, 'sink': 0.35},   # KULOOR - low industrial flat, deep sink
+    'Z3': {'slope': 1.5, 'sink': 0.15},   # KOTTARA - moderate slope
+    'Z4': {'slope': 0.3, 'sink': 0.40},   # BUNDER - very flat port area, deepest sink
+    'Z5': {'slope': 3.5, 'sink': 0.02},   # HAMPANKATTA - steep hill, almost no sink
+    'Z6': {'slope': 1.0, 'sink': 0.20},   # MANGALADEVI - moderate
+    'Z7': {'slope': 0.4, 'sink': 0.30},   # ULLAL - flat coastal, significant sink
+}
+
 def build_terrain_features(gdf_zones, output_dir="data/processed"):
     """
     Creates terrain features that perfectly match the frontend parameters.
+    Now includes per-zone slope and sink_depth for model differentiation.
     """
     logger.info("Building terrain features table...")
     
     features = []
     for z in FRONTEND_ZONES:
+        zt = ZONE_TERRAIN.get(z['id'], {'slope': 1.0, 'sink': 0.15})
         features.append({
             'zone_id': z['id'],
             'elevation_mean': z['elev'],
             'elevation_min': max(0, z['elev'] - 0.5),
             'elevation_max': z['elev'] + 0.5,
-            'slope_mean': 1.0,
-            'sink_depth': 0.15,
+            'slope_mean': zt['slope'],
+            'sink_depth': zt['sink'],
             'relative_elevation': z['elev'],
             'distance_to_coast': z['dist_coast'],
             'distance_to_creek': 0.5,

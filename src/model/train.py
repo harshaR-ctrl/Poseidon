@@ -88,7 +88,18 @@ def train_models(labels_path="data/cache/replay/scenario_labels.parquet",
     train_flood = train_mask & flood_mask
     test_flood = test_mask & flood_mask
     
-    onset_10_reg = xgb.XGBRegressor(n_estimators=100, objective='reg:squarederror')
+    # Tuned hyperparameters for higher accuracy
+    reg_params = {
+        'n_estimators': 300,
+        'learning_rate': 0.05,
+        'max_depth': 5,
+        'subsample': 0.8,
+        'colsample_bytree': 0.8,
+        'objective': 'reg:squarederror',
+        'random_state': 42
+    }
+    
+    onset_10_reg = xgb.XGBRegressor(**reg_params)
     onset_10_reg.fit(X[train_flood], df.loc[train_flood, 'onset_10cm'])
     mae_10 = mean_absolute_error(df.loc[test_flood, 'onset_10cm'], onset_10_reg.predict(X[test_flood]))
     logger.info(f"Onset@10cm MAE: {mae_10:.2f} hours")
@@ -98,7 +109,7 @@ def train_models(labels_path="data/cache/replay/scenario_labels.parquet",
     train_flood_30 = train_mask & flood_30_mask
     test_flood_30 = test_mask & flood_30_mask
     
-    onset_30_reg = xgb.XGBRegressor(n_estimators=100, objective='reg:squarederror')
+    onset_30_reg = xgb.XGBRegressor(**reg_params)
     if train_flood_30.sum() > 0:
         onset_30_reg.fit(X[train_flood_30], df.loc[train_flood_30, 'onset_30cm'])
         mae_30 = mean_absolute_error(df.loc[test_flood_30, 'onset_30cm'], onset_30_reg.predict(X[test_flood_30]))
@@ -106,7 +117,7 @@ def train_models(labels_path="data/cache/replay/scenario_labels.parquet",
     joblib.dump(onset_30_reg, os.path.join(output_dir, "onset_30_model.joblib"))
     
     logger.info("Training Model 5: Peak Time")
-    peak_reg = xgb.XGBRegressor(n_estimators=100, objective='reg:squarederror')
+    peak_reg = xgb.XGBRegressor(**reg_params)
     peak_reg.fit(X[train_flood], df.loc[train_flood, 'peak_hour'])
     mae_peak = mean_absolute_error(df.loc[test_flood, 'peak_hour'], peak_reg.predict(X[test_flood]))
     logger.info(f"Peak Time MAE: {mae_peak:.2f} hours")

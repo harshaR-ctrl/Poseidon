@@ -99,6 +99,15 @@ def set_scenario():
     current_live_scenario["wind"] = float(data.get("wind", 10))
     return jsonify({"status": "updated", "scenario": current_live_scenario})
 
+import random
+
+# Generate stochastic environmental noise unique to this server run
+SERVER_BOOT_NOISE = {
+    'rain_multiplier': random.uniform(0.7, 1.5),
+    'tide_multiplier': random.uniform(0.8, 1.3),
+    'elev_shift': random.uniform(-0.5, 0.5)
+}
+
 # API: Model Inference
 @app.route('/api/predict', methods=['POST'])
 def predict():
@@ -110,6 +119,16 @@ def predict():
             return jsonify({"error": "No zones provided"}), 400
             
         df = pd.DataFrame(zones_list)
+        
+        # Apply stochastic noise so predictions vary per server run
+        if 'rain_24h' in df.columns:
+            df['rain_24h'] *= SERVER_BOOT_NOISE['rain_multiplier']
+        if 'rain_peak_intensity' in df.columns:
+            df['rain_peak_intensity'] *= SERVER_BOOT_NOISE['rain_multiplier']
+        if 'tide_max' in df.columns:
+            df['tide_max'] *= SERVER_BOOT_NOISE['tide_multiplier']
+        if 'elevation_mean' in df.columns:
+            df['elevation_mean'] += SERVER_BOOT_NOISE['elev_shift']
         
         # Run XGBoost Inference
         predictions = run_inference(df)

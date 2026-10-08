@@ -20,17 +20,17 @@ def run_seed_and_train():
     zones = features.generate_h3_zones()
     features.build_terrain_features(zones)
     
-    # 2. Simulate 500 Historical Events (F2)
+    # 2. Simulate 2500 Historical Events (F2)
     logger.info("--- STEP 2: Running Poseidon-Sim to generate synthetic historical flood data ---")
-    # Increased to 500 events for realistic model accuracy and proper RPI/Alerts
-    poseidon_sim.generate_scenarios(n_scenarios=500)
+    # Increased to 2500 events for realistic model accuracy and proper RPI/Alerts
+    poseidon_sim.generate_scenarios(n_scenarios=2500)
     
     # 3. Train the XGBoost Models (F3)
     logger.info("--- STEP 3: Training XGBoost Prediction Models ---")
     train.train_models()
     
     logger.info("✅ SUCCESS: Data generated and models trained successfully.")
-    logger.info("You can now launch the dashboard by running: streamlit run app/streamlit_app.py")
+    logger.info("You can now launch the web dashboard by running the node backend in `web/` and opening `index.html`.")
 
 if __name__ == "__main__":
     run_seed_and_train()

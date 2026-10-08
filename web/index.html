@@ -89,6 +89,10 @@
                     <span class="text-muted">Onset</span>
                     <span class="mono" id="overlay-onset">--</span>
                 </div>
+                <div class="zone-info-row" id="evac-row" style="color: #FF7000;">
+                    <span class="text-muted" style="color: inherit;">Evac. Window</span>
+                    <span class="mono" id="overlay-evac">--</span>
+                </div>
                 <div class="zone-info-row">
                     <span class="text-muted">RPI Score</span>
                     <span class="mono" id="overlay-rpi">--</span>
@@ -176,10 +180,13 @@
         </div>
     </div>
 
-    <!-- Bottom: Timeline -->
-    <div id="bottom-bar">
+    <!-- Bottom: Timeline (Removed per user request) -->
+    <div id="bottom-bar" style="display: none;">
         <div id="scrubber-container">
-            <div class="slider-header">SIMULATION HOUR</div>
+            <div class="slider-header" style="display:flex; justify-content:space-between; align-items:center;">
+                <span>SIMULATION HOUR</span>
+                <button type="button" id="play-time-btn" style="background:transparent; color:#00F0FF; border:1px solid #00F0FF; border-radius:3px; cursor:pointer; font-size:10px; padding:2px 6px;" title="Auto-play timeline">▶ PLAY</button>
+            </div>
             <input type="range" id="time-slider" min="0" max="23" value="14">
             <div class="slider-labels">
                 <span class="mono">00:00</span>
