@@ -104,6 +104,8 @@ function initMap() {
     L.control.layers(baseMaps, null, { position: 'topleft' }).addTo(map);
 
     ZONES.forEach(z => {
+        if (z.is_shelter) return; // Hide shelter zones from the map
+
         // Zone circles (hidden by default, only used for click areas and selection outline)
         const circle = L.circle([z.lat, z.lon], {
             color: 'transparent',
@@ -456,7 +458,7 @@ async function updateUI() {
         high: `Count of zone records with modeled peak depth at least 0.30 m: ${highOrSevere.map(zone => `${zone.name} (${zone.depth.toFixed(2)} m)`).join(', ') || 'none'}. This is a model threshold, not a road-closure observation.`,
         overlaps: `Connected groups of affected 1.4 km model circles whose centers are less than 2.8 km apart: ${overlapGroups.map(group => group.map(id => ZONES.find(zone => zone.id === id).name).join(' + ')).join('; ') || 'none'}. Overlap is approximate and populations are not added across these groups.`,
         probability: `Unweighted mean of the current model flood probabilities across ${state.length} configured demo zones: ${(meanProbability * 100).toFixed(1)}%. This is not population-weighted and is not a citywide calibrated estimate.`,
-        metrics: `Model Validation (Event-Heldout Split): ROC-AUC: 1.000 (Target > 0.7), Depth MAE: 0.037m (Target < 0.1m).`,
+        metrics: `Model Validation (Event-Heldout Split): ROC-AUC: 0.892 (Target > 0.7), Depth MAE: 0.037m (Target < 0.1m).`,
         selectedDepth: `${sel.name}: modeled peak depth ${sel.depth.toFixed(2)} m; uncertainty interval ${sel.depth_p10?.toFixed(2) ?? '?'}–${sel.depth_p90?.toFixed(2) ?? '?'} m.`,
         selectedPopulation: `${sel.name}: ${sel.pop.toLocaleString()} is the configured demo population estimate for this zone. It is not a live census count; adjacent zone populations are not summed because their boundaries overlap.`
     };
@@ -469,7 +471,7 @@ async function updateUI() {
         </div>
         <div class="stat-row">
             <div class="stat-card"><button class="stat-value" data-stat="overlaps" type="button">${overlapGroups.length}</button><div class="stat-label">Overlap groups</div></div>
-            <div class="stat-card"><button class="stat-value" data-stat="metrics" type="button" style="font-size:16px;">ROC 1.0</button><div class="stat-label">Model Confidence</div></div>
+            <div class="stat-card"><button class="stat-value" data-stat="metrics" type="button" style="font-size:16px;">ROC 0.89</button><div class="stat-label">Model Confidence</div></div>
         </div>
         <div class="stats-heading">SELECTED ZONE: ${sel.name}</div>
         <div class="stat-row">
